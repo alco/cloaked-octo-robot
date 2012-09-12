@@ -11,7 +11,15 @@ defmodule Server do
   def accept_loop(sock) do
     case :gen_tcp.accept(sock) do
       { :ok, client_sock } ->
-        spawn_client(client_sock)
+        pid = spawn_client(client_sock)
+
+      case :inet.peername(sock) do
+        { :ok, { address, port } } ->
+          IO.puts "Process #{inspect pid} Got connection from a client: #{inspect address}:#{inspect port}"
+        other ->
+          IO.puts "Process #{inspect pid} Got connection from a client"
+      end
+
         accept_loop(sock)
       other -> other
     end
@@ -24,16 +32,10 @@ defmodule Server do
   def client_loop(sock) do
     pid = Process.self
 
-    case :inet.peername(sock) do
-      { :ok, { address, port } } ->
-        IO.puts "Process #{inspect pid} Got connection from a client: #{inspect address}:#{inspect port}"
-      other ->
-        IO.puts "Process #{inspect pid} Got connection from a client"
-    end
-
     case :gen_tcp.recv(sock, 0) do
       { :ok, packet } ->
         IO.puts "Process #{inspect pid} got packet #{packet}"
+        :gen_tcp.send(sock, packet)
         client_loop(sock)
       { :error, reason } ->
         IO.puts "Process #{inspect pid} recv error #{reason}"
