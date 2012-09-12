@@ -1,7 +1,8 @@
 defmodule Server do
-  def start() do
-    case :gen_tcp.listen(8000, [:binary, { :packet, :raw }, { :active, false }]) do
+  def start(port // 8000) do
+    case :gen_tcp.listen(port, [:binary, { :packet, :raw }, { :active, false }]) do
       { :ok, sock } ->
+        IO.puts "Listening on port #{port}..."
         accept_loop(sock)
       other -> other
     end
@@ -21,12 +22,21 @@ defmodule Server do
   end
 
   def client_loop(sock) do
+    pid = Process.self
+
+    case :inet.peername(sock) do
+      { :ok, { address, port } } ->
+        IO.puts "Process #{inspect pid} Got connection from a client: #{inspect address}:#{inspect port}"
+      other ->
+        IO.puts "Process #{inspect pid} Got connection from a client"
+    end
+
     case :gen_tcp.recv(sock, 0) do
       { :ok, packet } ->
-        IO.puts "Got packet #{packet}"
+        IO.puts "Process #{inspect pid} got packet #{packet}"
         client_loop(sock)
       { :error, reason } ->
-        IO.puts "Recv error #{reason}"
+        IO.puts "Process #{inspect pid} recv error #{reason}"
         :gen_tcp.close(sock)
     end
   end
