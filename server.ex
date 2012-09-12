@@ -1,6 +1,6 @@
 defmodule Server do
   def start(port // 8000) do
-    case :gen_tcp.listen(port, [:binary, { :packet, :raw }, { :active, false }]) do
+    case :gen_tcp.listen(port, [:binary, { :active, false }]) do
       { :ok, sock } ->
         IO.puts "Listening on port #{port}..."
         accept_loop(sock)
@@ -17,7 +17,7 @@ defmodule Server do
         { :ok, { address, port } } ->
           IO.puts "Process #{inspect pid} Got connection from a client: #{inspect address}:#{inspect port}"
         other ->
-          IO.puts "Process #{inspect pid} Got connection from a client"
+          IO.puts "Process #{inspect pid} Got connection from an unknown client"
       end
 
         accept_loop(sock)
