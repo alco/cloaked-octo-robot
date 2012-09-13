@@ -38,7 +38,7 @@ defmodule Server do
         :gen_tcp.send(sock, packet)
         client_loop(sock)
       { :error, reason } ->
-        IO.puts "Process #{inspect pid} recv error #{reason}"
+        IO.puts "Process #{inspect pid} did recieve error #{reason}"
         :gen_tcp.close(sock)
     end
   end

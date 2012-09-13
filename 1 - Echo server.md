@@ -24,35 +24,13 @@ end
 There are four functions. Let's implement them one by one. Note that all definitions should be placed between `defmodule` and `end` keywords. We simply omit them to avoid repetition.
 
 ```elixir
-def start(port // 8000) do
-  case :gen_tcp.listen(port, [:binary, { :active, false }]) do
-    { :ok, sock } ->
-      IO.puts "Listening on port #{port}..."
-      accept_loop(sock)
-    other -> other
-  end
-end
+>>> Server: def start
 ```
 
 This code defines a function of one argument. The default value for the argument is 8000. We to Erlang's gen_tcp.listen function to listen for incoming connections on the specified port. The function returns a new socket on which we will call gen_tcp.accept to start listening for incoming connections.
 
 ```elixir
-def accept_loop(sock) do
-  case :gen_tcp.accept(sock) do
-    { :ok, client_sock } ->
-      pid = spawn_client(client_sock)
-
-    case :inet.peername(sock) do
-      { :ok, { address, port } } ->
-        IO.puts "Process #{inspect pid} Got connection from a client: #{inspect address}:#{inspect port}"
-      other ->
-        IO.puts "Process #{inspect pid} Got connection from an unknown client"
-    end
-
-      accept_loop(sock)
-    other -> other
-  end
-end
+>>> Server: def accept_loop
 ```
 
 The function is called `accept_loop` for a reason. You want see familiar C-like `for` loops in Elixir. Instead, it approaches iteration with a recursive approach. Using this kind of tail-recursive pattern is characteristic of nearly every Elixir program out there.
@@ -60,27 +38,13 @@ The function is called `accept_loop` for a reason. You want see familiar C-like 
 The definition for spawn_client is as follows:
 
 ```elixir
-def spawn_client(sock) do
-  spawn __MODULE__, :client_loop, [sock]
-end
+>>> Server: def spawn_client
 ```
 
 Here we merely redirecting the call to the built-in `spawn` function that spawns a new process and returns its identifier -- the pid.
 
 ```elixir
-def client_loop(sock) do
-  pid = Process.self
-
-  case :gen_tcp.recv(sock, 0) do
-    { :ok, packet } ->
-      IO.puts "Process #{inspect pid} got packet #{packet}"
-      :gen_tcp.send(sock, packet)
-      client_loop(sock)
-    { :error, reason } ->
-      IO.puts "Process #{inspect pid} recv error #{reason}"
-      :gen_tcp.close(sock)
-  end
-end
+>>> Server: def client_loop
 ```
 
 This is another loop that continuosly receives data from the client and sends it back to the client.
@@ -89,28 +53,11 @@ Now, you might be thinking that having two infinite loops should not work. But r
 
 ## The Client Module ##
 
-Our client is very simple, so it can be demonstrated in a single code block:
+We'll be testing our server using netcat (`nc`) and a web browser, but let's first write a client in Elixir for demonstration purposes.
 
 ```elixir
 # client.ex
-defmodule Client do
-  def connect(address, port) do
-    case :gen_tcp.connect(address, port, [ { :active, false } ]) do
-      { :ok, sock } ->
-        sock
-      other -> other
-    end
-  end
-
-  def close(sock) do
-    :gen_tcp.close(sock)
-  end
-
-  def send(sock, data) do
-    :ok = :gen_tcp.send(sock, data)
-    :gen_tcp.recv(sock, 0)
-  end
-end
+>>> defmodule Client
 ```
 
 Start an iex session and run the server in it:
@@ -138,3 +85,35 @@ iex(2)> Client.send(sock, "abc")
 iex(3)> Client.close(sock)
 :ok
 ```
+
+This confirms that our server accepts data from the client and sends it back as is.
+
+Note that you can edit a module and recompile it without leaving the Elixir shell. Let's output a message in the client when it connects to the server. Introduce the following change inside the definition of `connect`:
+
+```elixir
+def connect(address, port) do
+    case :gen_tcp.connect(address, port, [ { :active, false } ]) do
+      { :ok, sock } ->
+        IO.puts "Did connect to server"     # <-- add this
+        sock
+      other -> other
+    end
+  end
+```
+
+```
+iex(2)> sock = Client.connect({127,0,0,1}, 8000)
+#Port<0.2740>
+
+# Edit the client code...
+
+iex(3)> c("client.ex")
+.../client.ex:1: redefining module Client
+[Client]
+iex(4)> sock = Client.connect({127,0,0,1}, 8000)
+Did connect to server
+#Port<0.2818>
+iex(5)>
+```
+
+For the server changing the code it a little more involved, because it's hanging in a loop. However, it is possible to reload the code for a running Elixir application. We'll take a look at how this can be implemented in a later article.
