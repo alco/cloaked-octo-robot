@@ -53,7 +53,7 @@ Now, you might be thinking that having two infinite loops should not work. But r
 
 ## The Client Module ##
 
-We'll be testing our server using netcat (`nc`) and a web browser, but let's first write a client in Elixir for demonstration purposes.
+We'll be testing our server using netcat (`nc`) and later a web browser, but let's first write a client in Elixir for demonstration purposes.
 
 ```elixir
 # client.ex
@@ -92,13 +92,13 @@ Note that you can edit a module and recompile it without leaving the Elixir shel
 
 ```elixir
 def connect(address, port) do
-    case :gen_tcp.connect(address, port, [ { :active, false } ]) do
-      { :ok, sock } ->
-        IO.puts "Did connect to server"     # <-- add this
-        sock
-      other -> other
-    end
+  case :gen_tcp.connect(address, port, [ { :active, false } ]) do
+    { :ok, sock } ->
+      IO.puts "Did connect to server"     # <-- add this
+      sock
+    other -> other
   end
+end
 ```
 
 ```
@@ -116,4 +116,4 @@ Did connect to server
 iex(5)>
 ```
 
-For the server changing the code it a little more involved, because it's hanging in a loop. However, it is possible to reload the code for a running Elixir application. We'll take a look at how this can be implemented in a later article.
+For the server, changing the code is a little more involved, because it's waiting in a loop. However, it is possible to reload the code for a running Elixir application. We'll take a look at how this can be implemented in a later article.
