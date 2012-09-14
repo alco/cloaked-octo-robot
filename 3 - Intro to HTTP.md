@@ -38,4 +38,26 @@ HTTP/1.0 <status number> <status word>
 
 ## Implementing HTTP server ##
 
-Luckily for us, the gen_tcp module already supports HTTP. All we need to do is set up a framework for handling different types of requests and calling appropriate handlers to process them.
+Luckily for us, the gen_tcp module already supports HTTP parsing. We'll still need to encode our replies to send back to the client though. All we'll be left to do then is to set up a framework for handling different types of requests and call appropriate handlers to process them.
+
+After HTTP parsing our request handler will get a record of the following form:
+
+```elixir
+defrecord HTTPRequest, method: "GET", path: "/", headers: Orddict.new
+iex(2)> r = HTTPRequest.new
+HTTPRequest[headers: {Orddict,[]}, method: "GET", path: "/"]
+```
+
+To iterate over the headers we can use Enum module to our help
+
+```elixir
+Enum.reduce headers, Orddict.new, fn({ name, value }, acc) ->
+    case name do
+      "Host" ->
+        acc = Dict.put acc, "Host", value
+      other ->
+        IO.puts "Unhandled header #{inspect other}"
+    end
+    acc
+end
+```
