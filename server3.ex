@@ -1,7 +1,7 @@
 defmodule Server do
   def start(options // nil) do
     port = (options && Keyword.get(options, :port)) || 0
-    case :gen_tcp.listen(port, [{ :active, false }, { :packet, :http }]) do
+    case :gen_tcp.listen(port, [{ :active, false }, { :packet, :http_bin }]) do
       { :ok, sock } ->
         IO.puts "Listening on port #{port}..."
         accept_loop(sock, options)
@@ -39,7 +39,7 @@ defmodule Server do
   def client_loop(sock, handler, state // nil) do
     pid = Process.self
     if state === nil do
-      state = Orddict.new
+      state = HTTPRequest.new
     end
 
     case :gen_tcp.recv(sock, 0) do
@@ -70,19 +70,24 @@ defmodule Server do
   end
 end
 
+defrecord HTTPRequest, method: :undefined, path: "/", headers: Orddict.new
+
 defmodule Handler do
   def handle(data, state) do
     case data do
       { :http_request, method, path, http_ver } ->
         IO.puts "#{method} at path #{inspect path}"
-        { :ok, state }
+        new_state = state.method(method).path(path)
+        { :ok, new_state }
 
       { :http_header, _, header, _, value } ->
         IO.puts "Header #{header} with value #{value}"
-        { :ok, state }
+        new_state = state.update_headers(Dict.put &1, atom_to_binary(header), value)
+        { :ok, new_state }
 
       :http_eoh ->
         IO.puts "End of headers"
+        IO.inspect state
         { :reply, "HTTP/1.0 200 OK", state }
 
       _ ->  # default case
