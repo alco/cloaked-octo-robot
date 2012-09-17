@@ -63,3 +63,7 @@ Enum.reduce headers, Orddict.new, fn({ name, value }, acc) ->
   acc
 end
 ```
+
+## Serving static content ##
+
+In order to test our server using a web browser, let's implement handling of the most common requests: HEAD, GET, and POST. We'll server static content from the _static_ directory. That is, when the client indicates the path "/" in the request, the content will be served from the _static_ directory.
