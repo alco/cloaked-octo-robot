@@ -48,16 +48,18 @@ iex(2)> r = HTTPRequest.new
 HTTPRequest[headers: {Orddict,[]}, method: "GET", path: "/"]
 ```
 
-To iterate over the headers we can use Enum module to our help
+As packets arrive, we will recieve one header at a time and accumulate it in our state. Once the whole request has been processed, we'll pass it on to the handler to get a reply. Then we'll format the reply into an HTTP response and send it back to the client.
+
+To iterate over the headers we can use Enum module to our help.
 
 ```elixir
 Enum.reduce headers, Orddict.new, fn({ name, value }, acc) ->
-    case name do
-      "Host" ->
-        acc = Dict.put acc, "Host", value
-      other ->
-        IO.puts "Unhandled header #{inspect other}"
-    end
-    acc
+  case name do
+    "Host" ->
+      acc = Dict.put acc, "Host", value
+    other ->
+      IO.puts "Unhandled header #{inspect other}"
+  end
+  acc
 end
 ```

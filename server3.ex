@@ -50,9 +50,9 @@ defmodule Server do
             { :ok, new_state } ->
               client_loop(sock, handler, new_state)
 
-            { :reply, data, new_state } ->
-              :gen_tcp.send(sock, data)
-              client_loop(sock, handler, new_state)
+            { :reply, status, data, new_state } ->
+              response_header = format_status(status)
+              :gen_tcp.send(sock, encode_http(response_header, data))
 
             { :close, reply } ->
               :gen_tcp.send(sock, reply)
@@ -68,9 +68,32 @@ defmodule Server do
         :gen_tcp.close(sock)
     end
   end
+
+  defp format_status(:ok, resp // HTTPResponse.new) do
+    resp = resp.status(200).status_str("OK")
+    resp.update_headers(fn(x) -> Dict.put x, "Date", to_binary(:httpd_util.rfc1123_date()) end)
+  end
+
+  defp encode_http(resp, data) do
+    headers = Enum.reduce resp.headers, "", fn({ name, value }, acc) ->
+      acc <> "#{name}: #{inspect value}\n"
+    end
+
+    if data do
+      headers = headers <> "Content-Length: #{size data}"
+    end
+
+"""
+HTTP/1.0 #{resp.status} #{resp.status_str}
+#{headers}
+
+#{data}
+"""
+  end
 end
 
 defrecord HTTPRequest, method: :undefined, path: "/", headers: Orddict.new
+defrecord HTTPResponse, status: 0, status_str: "", headers: Orddict.new, data: ""
 
 defmodule Handler do
   def handle(data, state) do
@@ -88,11 +111,16 @@ defmodule Handler do
       :http_eoh ->
         IO.puts "End of headers"
         IO.inspect state
-        { :reply, "HTTP/1.0 200 OK", state }
+        format_response(state)
+  #{ :reply, "HTTP/1.0 200 OK", state }
 
       _ ->  # default case
         { :close, "HTTP/1.0 503 Internal Server Error" }
     end
+  end
+
+  def format_response(state) do
+    { :reply, :ok, "", state }
   end
 end
 
