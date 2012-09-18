@@ -45,13 +45,14 @@ defmodule Server do
     case :gen_tcp.recv(sock, 0) do
       { :ok, packet } ->
         IO.puts "Process #{inspect pid} got packet #{inspect packet}"
-        handler = case packet do
-          { :http_request, method, pathspec, http_ver } ->
-            IO.puts "#{method} at path #{inspect pathspec}"
-            choose_handler(handlers, method, elem(pathspec, 2))
-          _ ->
-            Keyword.get state, :handler
-        end
+        #        handler = case packet do
+        #          { :http_request, method, pathspec, http_ver } ->
+        #            IO.puts "#{method} at path #{inspect pathspec}"
+        #            choose_handler(handlers, method, elem(pathspec, 2))
+        #          _ ->
+        #            Keyword.get state, :handler
+        #        end
+        [{_, handler}|_] = handlers
 
         IO.puts "Chosen handler = #{inspect handler}"
         IO.puts "packet = #{inspect packet}"
@@ -91,8 +92,15 @@ defmodule Server do
     end
   end
 
-  defp format_status(:ok, resp // HTTPResponse.new) do
+  defp format_status(status, resp // HTTPResponse.new)
+
+  defp format_status(:ok, resp) do
     resp = resp.status(200).status_str("OK")
+    resp.update_headers(fn(x) -> Dict.put x, "Date", to_binary(:httpd_util.rfc1123_date()) end)
+  end
+
+  defp format_status(:fail, resp) do
+    resp = resp.status(501).status_str("Not Implemented")
     resp.update_headers(fn(x) -> Dict.put x, "Date", to_binary(:httpd_util.rfc1123_date()) end)
   end
 
@@ -130,6 +138,10 @@ defmodule Handler do
         new_state = state.update_headers(Dict.put &1, atom_to_binary(header), value)
         { :ok, new_state }
 
+      { :http_error, reason } ->
+        IO.puts "DECODE ERROR: #{reason}"
+        { :close, "400 Bad Request" }
+
       :http_eoh ->
         IO.puts "End of headers"
         IO.inspect state
@@ -152,19 +164,24 @@ defmodule StaticHandler do
 
     case data do
       { :http_request, method, path, http_ver } ->
-        IO.puts "#{method} at path #{inspect path}"
+        #IO.puts "#{method} at path #{inspect path}"
         new_state = state.method(method).path(path)
         { :ok, new_state }
 
       { :http_header, _, header, _, value } ->
-        IO.puts "Header #{header} with value #{value}"
+        #IO.puts "Header #{header} with value #{value}"
         new_state = state.update_headers(Dict.put &1, atom_to_binary(header), value)
         { :ok, new_state }
 
+      { :http_error, reason } ->
+        IO.puts "DECODE ERROR: #{reason}"
+        { :close, "400 Bad Request" }
+
       :http_eoh ->
-        IO.puts "End of headers"
-        IO.inspect state
-        format_response(state)
+        #IO.puts "End of headers"
+        #IO.inspect state
+
+        handle_request(state.method, elem(state.path, 2), state.headers, state)
   #{ :reply, "HTTP/1.0 200 OK", state }
 
       _ ->  # default case
@@ -174,5 +191,25 @@ defmodule StaticHandler do
 
   def format_response(state) do
     { :reply, :ok, "Static OK", state }
+  end
+
+  def handle_request(:HEAD, path, _, state) do
+    IO.puts "HEAD at #{path}"
+    { :reply, :ok, "Static HEAD OK", state }
+  end
+
+  def handle_request(:GET, path, _, state) do
+    IO.puts "GET at #{path}"
+    { :reply, :ok, "Static GET OK", state }
+  end
+
+  def handle_request(:POST, path, _, state) do
+    IO.puts "POST at #{path}"
+    { :reply, :ok, "Static POST OK", state }
+  end
+
+  def handle_request(method, path, headers, state) do
+    IO.puts "->>> Unimplemented method #{method} for path #{path} with headers #{inspect headers}"
+    { :reply, :fail, "FAIL", state }
   end
 end

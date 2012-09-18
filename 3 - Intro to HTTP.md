@@ -64,6 +64,13 @@ Enum.reduce headers, Orddict.new, fn({ name, value }, acc) ->
 end
 ```
 
+## Basic routing ##
+
+A router is a module that allows us to map url patterns to handlers. Thus, we can setup multiple handlers for requests at different locations. This is done mostly to simplify the code and allow us to quickly swap in different handlers for debugging or other purposes.
+
+
 ## Serving static content ##
 
 In order to test our server using a web browser, let's implement handling of the most common requests: HEAD, GET, and POST. We'll server static content from the _static_ directory. That is, when the client indicates the path "/" in the request, the content will be served from the _static_ directory.
+
+Once we've parsed the request, our StaticHandler will look for a local file matching the given URL. If no such file is found, we'll return a 404 Not Found status. If it is found, we'll send it over to the client specifying the proper Content-Length in the response headers.
