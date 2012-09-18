@@ -99,6 +99,11 @@ defmodule Server do
     resp.update_headers(fn(x) -> Dict.put x, "Date", to_binary(:httpd_util.rfc1123_date()) end)
   end
 
+  defp format_status(:not_found, resp) do
+    resp = resp.status(404).status_str("Not Found")
+    resp.update_headers(fn(x) -> Dict.put x, "Date", to_binary(:httpd_util.rfc1123_date()) end)
+  end
+
   defp format_status(:fail, resp) do
     resp = resp.status(501).status_str("Not Implemented")
     resp.update_headers(fn(x) -> Dict.put x, "Date", to_binary(:httpd_util.rfc1123_date()) end)
@@ -181,7 +186,7 @@ defmodule StaticHandler do
         #IO.puts "End of headers"
         #IO.inspect state
 
-        handle_request(state.method, elem(state.path, 2), state.headers, state)
+        handle_request(state.method, state.path, state.headers, state)
   #{ :reply, "HTTP/1.0 200 OK", state }
 
       _ ->  # default case
@@ -194,22 +199,65 @@ defmodule StaticHandler do
   end
 
   def handle_request(:HEAD, path, _, state) do
-    IO.puts "HEAD at #{path}"
+    IO.puts "HEAD at #{inspect path}"
     { :reply, :ok, "Static HEAD OK", state }
   end
 
   def handle_request(:GET, path, _, state) do
-    IO.puts "GET at #{path}"
-    { :reply, :ok, "Static GET OK", state }
+    IO.puts "GET at #{inspect path}"
+    file_data = get_local_file(resolve_path_to_local(path))
+    if file_data === nil do
+      { :reply, :not_found, "", state }
+    else
+      { file_size, content } = file_data
+      { :reply, :ok, content, state }
+    end
   end
 
   def handle_request(:POST, path, _, state) do
-    IO.puts "POST at #{path}"
+    IO.puts "POST at #{inspect path}"
     { :reply, :ok, "Static POST OK", state }
   end
 
   def handle_request(method, path, headers, state) do
-    IO.puts "->>> Unimplemented method #{method} for path #{path} with headers #{inspect headers}"
+    IO.puts "->>> Unimplemented method #{method} for path #{inspect path} with headers #{inspect headers}"
     { :reply, :fail, "FAIL", state }
+  end
+
+  defp resolve_path_to_local(pathspec) do
+    #    '*' |
+    #    {absoluteURI, http|https, Host=HttpString, Port=integer()|undefined, Path=HttpString} |
+    #    {scheme, Scheme=HttpString, HttpString} |
+    #    {abs_path, HttpString} | HttpString
+    case pathspec do
+      :* ->
+        nil
+      { :absoluteURI, _scheme, _host, _port, _path } ->
+        IO.puts "Got absoluteURI #{inspect pathspec}"
+        nil
+      { :scheme, _scheme, _string } ->
+        IO.puts "Got scheme #{inspect pathspec}"
+        nil
+      { :abs_path, string } ->
+        string
+    end
+  end
+
+  defp get_local_file(path) do
+    if path === nil do
+      nil
+    else
+      if :filename.pathtype(path) == :absolute do
+        "/" <> path = path
+      end
+      path = :filename.join("static", path)
+      cond do
+        not File.regular?(path) ->
+          nil
+        true ->
+          { :ok, data } = File.read(path)
+          { size(data), data }
+      end
+    end
   end
 end
