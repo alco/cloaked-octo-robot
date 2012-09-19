@@ -1,6 +1,6 @@
 defmodule ClientTest do
   @doc """
-  Send a message every second until n > 0
+  Send a message every second while n > 0
   """
   def send_loop(sock, n) do
     if n > 0 do
