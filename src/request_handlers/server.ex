@@ -66,27 +66,3 @@ defmodule Server do
     end
   end
 end
-
-defmodule Handler do
-  def handle("buy " <> data, state) do
-    article = "a"
-    count = Dict.get(state, data)
-    if count != nil do
-      article = "another"
-    end
-    { :reply, "You've got #{article} #{data}", Dict.update(state, data, 1, &1 + 1)  }
-  end
-
-  def handle("sell " <> data, state) do
-    count = Dict.get(state, data, 0)
-    if count > 0  do
-      { :reply, "You have sold the #{data}", Dict.update(state, data, &1 - 1) }
-    else
-      { :reply, "You don't have a #{data}", state }
-    end
-  end
-
-  def handle(data, _) do
-    { :close, "Don't know what to do with #{data}" }
-  end
-end
