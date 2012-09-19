@@ -1,11 +1,12 @@
 Echo server
 ===========
 
-Let's start by implementing an echo server using TCP socket functionality provided by the Erlang's `gen_tcp` module.
+Let's start by implementing an echo server using TCP socket functionality provided by Erlang's `gen_tcp` module.
 
-We'll defined separate modules for the server and for the client. The server will be listening on a port and when a new client has connected, it will spawn a new process to handle the new connection.
+The server will open a listening socket and wait for a client to connect. Once a new connection is requested, the server spawns a new process to handle it. Erlang processes are cheap and lightweight, so by using this approach we can support a large number of simultaneous connections.
 
-This is a common way to handle multiple concurrent tasks in Elixir. You create a process that runs concurrently with all other processes. The processes can talk to each other by means of sending messages. By contrast to older languages, you don't have to manages the system resources yourself, the language does this for you.
+This is a common way to handle multiple concurrent tasks in Erlang. You create a process that runs concurrently with all other processes. The processes can talk to each other by means of sending messages. By contrast to older languages, you don't have to manages the system resources yourself, the implementation already does this for you. All in all, this creates a programming model that is much easier and intuitive, allowing us to write more sophisticated software with less effort and less bugs in it.
+
 
 ## The Server Module ##
 
