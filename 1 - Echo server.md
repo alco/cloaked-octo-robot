@@ -139,7 +139,6 @@ Sample output:
 ```
 $ elixir server_client_test.exs
 Listening on port 8000...
-Did connect to server
 Process <0.37.0>: Got connection from a client: {127,0,0,1}:57375
 Process <0.37.0>: Got packet Hello, server 5
 Process <0.2.0>: Got reply from server: Hello, server 5
@@ -156,36 +155,31 @@ All done
 
 ## Interlude: Recompiling On The Go ##
 
-Note that you can edit a module and recompile it without leaving the Elixir shell. Let's output a message in the client when it connects to the server. Introduce the following change inside the definition of `connect`:
-
-```elixir
-def connect(address, port) do
-  case :gen_tcp.connect(address, port, [ { :active, false } ]) do
-    { :ok, sock } ->
-      IO.puts "Did connect to server"     # <-- add this
-      sock
-    other -> other
-  end
-end
-```
+If you're testing a module from the Elixir shell, you can edit a module and recompile it without leaving the shell. Let's try that out with the client. Start the server in one terminal window and open iex in another one:
 
 ```
-iex(2)> sock = Client.connect({127,0,0,1}, 8000)
+$ iex client.ex
+Interactive Elixir (0.6.0) - press Ctrl+C to exit
+Erlang R15B01 (erts-5.9.1) [source] [64-bit] [smp:4:4] [async-threads:0] [hipe] [kernel-poll:false]
+
+iex(1)> sock = Client.connect({127,0,0,1}, 8000)
 #Port<0.2740>
 
-# Edit the client code...
+#
+# Now add the following line inside `connect` just before returning the socket.
+#
+#   IO.puts "Did connect to server"
+#
 
-iex(3)> c("client.ex")
+iex(2)> c("client.ex")
 .../client.ex:1: redefining module Client
 [Client]
-iex(4)> sock = Client.connect({127,0,0,1}, 8000)
+iex(3)> sock = Client.connect({127,0,0,1}, 8000)
 Did connect to server
 #Port<0.2818>
-iex(5)>
 ```
 
-For the server, changing the code is a little more involved, because it's waiting in a loop. However, it is possible to reload the code for a running Elixir application. We'll take a look at how this can be implemented in a later article.
-
+On the server side, changing the code is a little bit more involved, because it's hanging in a loop. However, it is possible to reload the code for a running Elixir application. We'll take a look at how this can be implemented in a later article.
 
 ## Further Reading ##
 

@@ -13,7 +13,6 @@ defmodule Client do
   def connect(address, port) do
     case :gen_tcp.connect(address, port, [{:active, false}]) do
       { :ok, sock } ->
-        IO.puts "Did connect to server"
         sock
 
       { :error, reason } ->
