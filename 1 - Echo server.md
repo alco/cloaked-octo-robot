@@ -151,7 +151,7 @@ All done
 
   * Think about a way to limit the number of active connections to prevent flooding the server with a DoS attack.
 
-## Interlude: Recompiling On The Go ##
+## Side Note: Recompiling On The Go ##
 
 If you're testing a module in Elixir shell, you can edit a module and recompile it without leaving the shell. Let's try this out with the our client module. Start the server in one terminal window and open iex in another one:
 
