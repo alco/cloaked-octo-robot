@@ -1,5 +1,5 @@
-Handling requests
-=================
+Request Handlers
+================
 
 Our server is working fine but it implements a very limited functionality. In order to make it more useful, we will allow users to define custom handlers. A handler is a function that is called by the server whenever it recieves a new logical set of data. This approach allows us to have a single server module used by different applications. The application logic is implemented in the handlers while improving the server is beneficial for all applications based on it.
 
