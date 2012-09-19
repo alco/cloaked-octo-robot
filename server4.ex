@@ -200,7 +200,13 @@ defmodule StaticHandler do
 
   def handle_request(:HEAD, path, _, state) do
     IO.puts "HEAD at #{inspect path}"
-    { :reply, :ok, "Static HEAD OK", state }
+    stat = get_local_file_stat(path)
+    if stat === nil do
+      { :reply, :not_found, "", state }
+    else
+      content_length = stat.size
+      { :reply, :ok, content_length, state }
+    end
   end
 
   def handle_request(:GET, path, _, state) do
@@ -240,6 +246,23 @@ defmodule StaticHandler do
         nil
       { :abs_path, string } ->
         string
+    end
+  end
+
+  defp get_local_file_stat(path) do
+    if path === nil do
+      nil
+    else
+      if :filename.pathtype(path) == :absolute do
+        "/" <> path = path
+      end
+      path = :filename.join("static", path)
+      cond do
+        not File.regular?(path) ->
+          nil
+        true ->
+          File.stat(path)
+      end
     end
   end
 
