@@ -38,7 +38,7 @@ defmodule Server do
         accept_loop(sock)
 
       { :error, reason } ->
-        IO.puts "Failed to accept connections on socket: #{reason}"
+        IO.puts "Failed to accept on socket: #{reason}"
     end
   end
 
