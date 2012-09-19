@@ -1,0 +1,310 @@
+Echo Server
+===========
+
+Let's start by implementing an echo server using TCP socket functionality provided by Erlang's `gen_tcp` module.
+
+The server will open a listening socket and wait for a client to connect. Once a new connection is requested, the server spawns a new process to handle it. Erlang processes are cheap and lightweight, so by using this approach we can support a large number of simultaneous connections.
+
+This is a common way to handle multiple concurrent tasks in Erlang. You create a process that runs concurrently with all other processes. The processes can talk to each other by means of sending messages. By contrast to programming languages that don't include concurrency semantics as part of the language, you don't have to manage system resources yourself, the implementation does this for you. All in all, this creates a programming model that is much easier and intuitive, allowing us to write more sophisticated software with less effort and less bugs in it, and it will still look simple and manageable.
+
+
+## The Server Module ##
+
+Our server module has the following outline:
+
+```elixir
+# server.ex
+defmodule Server do
+  # The only public function
+  def start(port // 8000)
+
+  # Implementation details
+  defp accept_loop(sock)
+  defp spawn_client(sock)
+  def  client_start(sock)
+  defp client_loop(sock)
+end
+```
+
+There is a single public function, the rest is implementation details.
+
+> Technically, `client_start` is also public, but we specify `@doc false` for it, so it's not considered to be part of the module API.
+
+Let's start with the `start` function.
+
+```elixir
+  def start(port // 8000) do
+    # :binary is used to get the packets as strings instead of charlists
+    #
+    # { :active, false } creates a passive socket, i.e. we'll need to call
+    # :gen_tcp.recv to get incoming packets
+    # See http://www.erlang.org/doc/man/inet.html#setopts-2 for more details.
+    case :gen_tcp.listen(port, [:binary, {:active, false}]) do
+      { :ok, sock } ->
+        IO.puts "Listening on port #{port}..."
+        accept_loop(sock)
+
+      { :error, reason } ->
+        IO.puts "Error starting the server: #{reason}"
+    end
+  end
+```
+
+`start` is a function of one argument (with a default value of 8000). It obtains a socket suitable for accepting incoming connections on the specified port and passes it on to `accept_loop`.
+
+```elixir
+  defp accept_loop(sock) do
+    case :gen_tcp.accept(sock) do
+      { :ok, client_sock } ->
+        # Spawn a new process and make a recursive tail-call to continue
+        # accepting new connections.
+        spawn_client(client_sock)
+        accept_loop(sock)
+
+      { :error, reason } ->
+        IO.puts "Failed to accept on socket: #{reason}"
+    end
+  end
+```
+
+`accept_loop` demonstrates an idiomatic recursive tail-call loop in Erlang. `:get_tcp.accept` will block until a new connection is accepted. Once it returns, we'll spawn a new process to handle it and do a recursive tail-call to `accept_loop` to keep listening for new connections. Because this is a tail-call, it does not consume additional stack space, so this loop might go on indefinitely, no matter how many connections are established during the lifetime of the server.
+
+Next, let's look at `spawn_client` and `client_start`.
+
+```elixir
+  defp spawn_client(sock) do
+    spawn __MODULE__, :client_start, [sock]
+  end
+
+  def client_start(sock) do
+    pid = Process.self
+
+    # Get info about the client
+    case :inet.peername(sock) do
+      { :ok, { address, port } } ->
+        IO.puts "Process #{inspect pid}: Got connection from a client: #{inspect address}:#{inspect port}"
+
+      { :error, reason } ->
+        IO.puts "Process #{inspect pid}: Got connection from an unknown client (#{reason})"
+    end
+
+    # Start the recieve loop
+    client_loop(sock)
+  end
+```
+
+In `spawn_client` we're invoking the built-in `spawn` function that creates a new process and returns its pid -- a unique process identifier. The newly spawned process will start running the `client_start` function with `sock` as its argument.
+
+`client_start` outputs some debug info and passes the control flow over to `client_loop`. This last function is going to be the heart of the process, accepting packets from the client and sending back replies. As you might have guessed, it will also do a recursive tail-call of itself to keep receiving new packets until the connection is closed.
+
+```elixir
+  defp client_loop(sock) do
+    pid = Process.self
+
+    # :gen_tcp.recv will block until some amount of data becomes available.
+    case :gen_tcp.recv(sock, 0) do
+      { :ok, packet } ->
+        IO.puts "Process #{inspect pid}: Got packet #{packet}"
+        :gen_tcp.send(sock, packet)
+        client_loop(sock)
+
+      { :error, reason } ->
+        IO.puts "Process #{inspect pid}: Error receiving a packet: #{reason}"
+        :gen_tcp.close(sock)
+    end
+  end
+```
+
+This is the core of the client process. Inside this function, we're continuosly receive data from the socket and send it back to the client.
+
+Remember that we have spawned a new process and started executing `client_loop` in it. In Erlang, all processes share execution time or run in parallel if hardware allows. With each new client we'll call another `client_loop` that will be running in its own process. Since most of the time the loops are spending waiting for an IO operation to complete, the whole server is very conservative of system resources. This is a very common scenario in real world production systems (node.js, for instance, is built around the concept of giving up control of the current execution frame while an IO operation is running).
+
+This concludes our server implementation. It didn't take much code to build something that is usable and can manage hundreds or even thousands of clients easily. Let's do a quick test run to see how it works.
+
+## Testing The Server ##
+
+We'll be using netcat to establish a raw socket connection to the server running locally. If you don't have netcat, telnet will do.
+
+```
+$ iex server.ex
+Interactive Elixir (0.6.0) - press Ctrl+C to exit
+Erlang R15B01 (erts-5.9.1) [source] [64-bit] [smp:4:4] [async-threads:0] [hipe] [kernel-poll:false]
+
+iex(1)> Server.start
+Listening on port 8000...
+```
+
+Our server is now listening for an incoming connection. Open another terminal window and launch netcat in it:
+
+```
+$ nc localhost 8000
+hello
+hello
+?
+?
+123
+123
+^D
+```
+
+And on the server side we get the following output:
+
+```
+Listening on port 8000...
+Process <0.39.0>: Got connection from a client: {127,0,0,1}:57124
+Process <0.39.0>: Got packet hello
+
+Process <0.39.0>: Got packet ?
+
+Process <0.39.0>: Got packet 123
+
+Process <0.39.0>: Error receiving a packet: closed
+```
+
+Our server is working as expected: for each message that we send to it, it sends back its exact copy. When the connection is closed by the client, our `client_loop` function returns and the process associated with that connection is terminated.
+
+## The Client Module ##
+
+Let us also write a client in Elixir for the sake of covering both ends of `gen_tcp` functionality: listening and connecting.
+
+```elixir
+# client.ex
+defmodule Client do
+  @moduledoc """
+  A simple TCP client.
+  """
+
+  @doc """
+  Connect to the given address and return a socket suitable for sending data.
+
+    address -- a 4-tuple with IP address components
+    port    -- port number on the remote server
+
+  """
+  def connect(address, port) do
+    case :gen_tcp.connect(address, port, [{:active, false}]) do
+      { :ok, sock } ->
+        sock
+
+      { :error, reason } ->
+        IO.puts "Error establishing connection"
+    end
+  end
+
+  @doc """
+  Close connection.
+  """
+  def close(sock) do
+    :gen_tcp.close(sock)
+  end
+
+  @doc """
+  Send data to the server and wait for a reply.
+  """
+  def send(sock, data) do
+    :ok = :gen_tcp.send(sock, data)
+    :gen_tcp.recv(sock, 0)
+  end
+end
+```
+
+The code is self explanatory. We're using `connect` to establish connection with the server. Then we invoke the already familiar `send` and `receive` functions to send and receive data on the socket.
+
+Now we can write an automated test script to see how both server and client modules work in tandem.
+
+```elixir
+# server_client_test.exs
+defmodule ClientTest do
+  @doc """
+  Send a message every second while n > 0
+  """
+  def send_loop(sock, n) do
+    if n > 0 do
+      receive do
+      after
+        1000 ->
+          { :ok, reply } = Client.send(sock, "Hello, server #{n}")
+          IO.puts "Process #{inspect Process.self}: Got reply from server: #{reply}"
+      end
+      send_loop(sock, n - 1)
+    else
+      nil
+    end
+  end
+end
+
+# Start the server in a separate process
+spawn Server, :start, []
+
+# Wait for the server process to start
+receive do
+after
+  1000 -> :ok
+end
+
+# Establish connection with the server
+sock = Client.connect({127,0,0,1}, 8000)
+
+# Start sending packets
+ClientTest.send_loop(sock, 5)
+
+IO.puts "All done"
+```
+
+Sample output:
+
+```
+$ elixir server_client_test.exs
+Listening on port 8000...
+Process <0.37.0>: Got connection from a client: {127,0,0,1}:57375
+Process <0.37.0>: Got packet Hello, server 5
+Process <0.2.0>: Got reply from server: Hello, server 5
+Process <0.37.0>: Got packet Hello, server 4
+Process <0.2.0>: Got reply from server: Hello, server 4
+Process <0.37.0>: Got packet Hello, server 3
+Process <0.2.0>: Got reply from server: Hello, server 3
+Process <0.37.0>: Got packet Hello, server 2
+Process <0.2.0>: Got reply from server: Hello, server 2
+Process <0.37.0>: Got packet Hello, server 1
+Process <0.2.0>: Got reply from server: Hello, server 1
+All done
+```
+
+## Exercises ##
+
+  * Improve the test script: spawn 100 client processes that periodically send messages to a single server.
+
+  * Think about a way to limit the number of active connections to prevent flooding the server with a DoS attack.
+
+## Side Note: Recompiling On The Go ##
+
+If you're testing a module in Elixir shell, you can edit a module and recompile it without leaving the shell. Let's try this out with the our client module. Start the server in one terminal window and open iex in another one:
+
+```
+$ iex client.ex
+Interactive Elixir (0.6.0) - press Ctrl+C to exit
+Erlang R15B01 (erts-5.9.1) [source] [64-bit] [smp:4:4] [async-threads:0] [hipe] [kernel-poll:false]
+
+iex(1)> sock = Client.connect({127,0,0,1}, 8000)
+#Port<0.2740>
+
+#
+# Now add the following line inside `connect` function in client.ex, just before returning the socket.
+#
+#   IO.puts "Did connect to server"
+#
+
+iex(2)> c("client.ex")
+.../client.ex:1: redefining module Client
+[Client]
+iex(3)> sock = Client.connect({127,0,0,1}, 8000)
+Did connect to server
+#Port<0.2818>
+```
+
+On the server side, changing the code is a little bit more involved, because it's hanging in a loop. However, it is possible to reload the code for a running Erlang application. We'll take a look at how this can be implemented in a later article.
+
+## Further Reading ##
+
+  * `gen_tcp` module documentation ([link](http://www.erlang.org/doc/man/gen_tcp.html))
+  * An example of using UDP and TCP sockets in Erlang ([link](http://learnyousomeerlang.com/buckets-of-sockets))
