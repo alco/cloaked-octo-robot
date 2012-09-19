@@ -15,7 +15,8 @@ defmodule Server do
     #
     # { :active, false } creates a passive socket, i.e. we'll need to call
     # :gen_tcp.recv to get incoming packets
-    case :gen_tcp.listen(port, [:binary, { :active, false }]) do
+    # See http://www.erlang.org/doc/man/inet.html#setopts-2 for more details.
+    case :gen_tcp.listen(port, [:binary, {:active, false}]) do
       { :ok, sock } ->
         IO.puts "Listening on port #{port}..."
         accept_loop(sock)
@@ -72,12 +73,13 @@ defmodule Server do
   end
 
   """
-  The receive loop which waits for packet from the client and sends it back,
+  The receive loop which waits for a packet from the client and sends it back,
   effectively turning it into an echo server.
   """
   defp client_loop(sock) do
     pid = Process.self
 
+    # :gen_tcp.recv will block until some amount of data becomes available.
     case :gen_tcp.recv(sock, 0) do
       { :ok, packet } ->
         IO.puts "Process #{inspect pid}: Got packet #{packet}"

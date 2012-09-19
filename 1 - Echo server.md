@@ -60,46 +60,81 @@ In `spawn_client` we're merely invoking the built-in `spawn` function that creat
 >>> server.ex: def client_loop
 ```
 
-This is another loop that continuosly receives data from the client and sends it back to the client.
+This is the core of the client process. It continuosly receives data from the socket and sends it back to the client.another loop that continuosly receives data from the client and sends it back to the client.
 
-Now, you might be thinking that having two infinite loops should not work. But remember that we have spawned a new process and started executing `client_loop` in it. In Elixir all processes share execution time or run in parallel if hardware allows. So both of our loops are running simultaneously. With each new client we'll get another client_loop running in its own process. If you look at process explorer you'll see that the Elixir process (beam.smp) hardly uses any CPU at all. That's because both our loops are spending most of their time waiting for in IO operation. This is a very common scenario in real world production systems.
+Remember that we have spawned a new process and started executing `client_loop` in it. In Erlang, all processes share execution time or run in parallel if hardware allows. With each new client we'll call another `client_loop` that will be running in its own process. Since most of the time the loops are spending waiting for an IO operation to complete, the whole server is very conservative with regards to the amount of system resources it requires. This is a very common scenario in real world production systems (node.js, for instance, is built around the concept of giving up control of the current execution frame while an IO operation is running).
 
-## The Client Module ##
+This concludes our server implementation. It didn't take much code to build something useable and able to serve to hundreds or thousands of client easily. Let's do a quick test run to see how it works.
 
-We'll be testing our server using netcat (`nc`) and later a web browser, but let's first write a client in Elixir for demonstration purposes.
+## Testing The Server ##
 
-```elixir
-# client.ex
->>> defmodule Client
-```
-
-Start an iex session and run the server in it:
+We'll be using netcat to establish a raw socket connection to the server running locally. If you don't have netcat, telnet will do.
 
 ```
-λ iex server.ex
+$ iex server.ex
 Interactive Elixir (0.6.0) - press Ctrl+C to exit
-Erlang R15B01 (erts-5.9.1) [source] [64-bit] [smp:8:8] [async-threads:0] [hipe] [kernel-poll:false]
+Erlang R15B01 (erts-5.9.1) [source] [64-bit] [smp:4:4] [async-threads:0] [hipe] [kernel-poll:false]
 
 iex(1)> Server.start
 Listening on port 8000...
 ```
 
-In another terminal window, launch the client:
+Our server is now listening for an incoming connection. Open another terminal window and launch netcat in it:
 
 ```
-λ iex client.ex
-Interactive Elixir (0.6.0) - press Ctrl+C to exit
-Erlang R15B01 (erts-5.9.1) [source] [64-bit] [smp:8:8] [async-threads:0] [hipe] [kernel-poll:false]
-
-iex(1)> sock = Client.connect({127,0,0,1}, 8000)
-#Port<0.2718>
-iex(2)> Client.send(sock, "abc")
-{:ok,'abc'}
-iex(3)> Client.close(sock)
-:ok
+$ nc localhost 8000
+hello
+hello
+?
+?
+123
+123
+^D
 ```
 
-This confirms that our server accepts data from the client and sends it back as is.
+And on the server side we get the following output:
+
+```
+Listening on port 8000...
+Process <0.39.0>: Got connection from a client: {127,0,0,1}:57124
+Process <0.39.0>: Got packet hello
+
+Process <0.39.0>: Got packet ?
+
+Process <0.39.0>: Got packet 123
+
+Process <0.39.0>: Error receiving a packet: closed
+```
+
+Our server is working as expected: for each message that we send to it, it sends back its exact copy. When the connection is closed by the client, our `client_loop` function returns and the process associated with that connection is terminated.
+
+## Exercises ##
+
+  *
+
+  *
+
+  *
+
+## The Client Module ##
+
+Let us also write a client in Elixir for the sake of covering both ends of `gen_tcp` functionality: listening and connecting.
+
+```elixir
+# client.ex
+>>> client.ex: *
+```
+
+The code is self explanatory. We're using `connect` to establish connection with the server. Then we invoke the already familiar `send` and `receive` functions send and receive data over the socket.
+
+Now we can write an automated test script to see how both server and client modules work in tandem.
+
+```elixir
+# server_client_test.exs
+>>> server_client_test.exs: *
+```
+
+## Interlude: Recompiling On The Go ##
 
 Note that you can edit a module and recompile it without leaving the Elixir shell. Let's output a message in the client when it connects to the server. Introduce the following change inside the definition of `connect`:
 
@@ -130,3 +165,8 @@ iex(5)>
 ```
 
 For the server, changing the code is a little more involved, because it's waiting in a loop. However, it is possible to reload the code for a running Elixir application. We'll take a look at how this can be implemented in a later article.
+
+
+## Further Reading ##
+
+  * http://learnyousomeerlang.com/buckets-of-sockets
