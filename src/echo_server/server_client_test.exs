@@ -30,6 +30,6 @@ end
 sock = Client.connect({127,0,0,1}, 8000)
 
 # Start sending packets
-ClientTest.send_loop(sock, 10)
+ClientTest.send_loop(sock, 5)
 
 IO.puts "All done"

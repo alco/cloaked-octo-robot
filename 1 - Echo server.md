@@ -134,6 +134,26 @@ Now we can write an automated test script to see how both server and client modu
 >>> server_client_test.exs: *
 ```
 
+Sample output:
+
+```
+$ elixir server_client_test.exs
+Listening on port 8000...
+Did connect to server
+Process <0.37.0>: Got connection from a client: {127,0,0,1}:57375
+Process <0.37.0>: Got packet Hello, server 5
+Process <0.2.0>: Got reply from server: Hello, server 5
+Process <0.37.0>: Got packet Hello, server 4
+Process <0.2.0>: Got reply from server: Hello, server 4
+Process <0.37.0>: Got packet Hello, server 3
+Process <0.2.0>: Got reply from server: Hello, server 3
+Process <0.37.0>: Got packet Hello, server 2
+Process <0.2.0>: Got reply from server: Hello, server 2
+Process <0.37.0>: Got packet Hello, server 1
+Process <0.2.0>: Got reply from server: Hello, server 1
+All done
+```
+
 ## Interlude: Recompiling On The Go ##
 
 Note that you can edit a module and recompile it without leaving the Elixir shell. Let's output a message in the client when it connects to the server. Introduce the following change inside the definition of `connect`:
