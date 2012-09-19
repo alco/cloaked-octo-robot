@@ -15,37 +15,49 @@ Our module has the following outline:
 ```elixir
 # server.ex
 defmodule Server do
+  # The only public function
   def start(port // 8000)
-  def accept_loop(sock)
-  def spawn_client(sock)
-  def client_loop(sock)
+
+  # Implementation details
+  defp accept_loop(sock)
+  defp spawn_client(sock)
+  def  client_start(sock)
+  defp client_loop(sock)
 end
 ```
 
-There are four functions. Let's implement them one by one. Note that all definitions should be placed between `defmodule` and `end` keywords. We simply omit them to avoid repetition.
+There is a single public function, the rest is implementation details.
+
+> Note: Technically, `client_start` is also public, but we specify `@doc false` for it, so it's not considered to be a part of the module API.
+
+Let's start with the `start` function.
 
 ```elixir
->>> Server: def start
+>>> server.ex: def start
 ```
 
-This code defines a function of one argument. The default value for the argument is 8000. We to Erlang's gen_tcp.listen function to listen for incoming connections on the specified port. The function returns a new socket on which we will call gen_tcp.accept to start listening for incoming connections.
+`start` is a function of one argument (with a default value of 8000). It obtains a socket suitable for accepting incoming connections on the specified port and passes it on to `accept_loop`.
 
 ```elixir
->>> Server: def accept_loop
+>>> server.ex: def accept_loop
 ```
 
-The function is called `accept_loop` for a reason. You want see familiar C-like `for` loops in Elixir. Instead, it approaches iteration with a recursive approach. Using this kind of tail-recursive pattern is characteristic of nearly every Elixir program out there.
+`accept_loop` demonstrates an idiomatic recursive tail-call loop in Elixir. `:get_tcp.accept` will block until a new connection is accepted. Once it returns, we'll spawn a new process to handle it and do a recursive tail-call to `accept_loop` to keep listening for new connections. Because this is a tail-call, it does not consume additional stack space, so this loop might go on indefinitely, no matter how many connections are made to the server.
 
-The definition for spawn_client is as follows:
+Next, let's look at `spawn_client` and `client_start`.
 
 ```elixir
->>> Server: def spawn_client
+>>> server.ex: def spawn_client
+
+>>> server.ex: def client_start
 ```
 
-Here we merely redirecting the call to the built-in `spawn` function that spawns a new process and returns its identifier -- the pid.
+In `spawn_client` we're merely invoking the built-in `spawn` function that creates a new process and returns its identifier -- the pid. The newly spawned process will start running the `client_start` function with `sock` as its argument.
+
+`client_start` outputs some debug info and passes the control flow over to `client_loop`. This last function is going to be the heart of the process, accepting packets from the client and sending back replies. As you might have guessed, it will also do a recursive tail-call of itself to keep receiving new packets until the connection is closed.
 
 ```elixir
->>> Server: def client_loop
+>>> server.ex: def client_loop
 ```
 
 This is another loop that continuosly receives data from the client and sends it back to the client.
