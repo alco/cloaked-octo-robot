@@ -80,17 +80,17 @@ defmodule Server do
   The receive loop which waits for a packet from the client, then invokes the
   handler function and sends its return value back to the client.
   """
-  def client_loop(sock, handler, state // Orddict.new) do
+  def client_loop(sock, handler, state // Orddict.new) do  # <--
     pid = Process.self
 
     case :gen_tcp.recv(sock, 0) do
       { :ok, packet } ->
         IO.puts "Process #{inspect pid} got packet #{packet}"
         if handler do
-          case handler.(packet, state) do
-            { :reply, data, new_state } ->
+          case handler.(packet, state) do                  # <--
+            { :reply, data, new_state } ->                 # <--
               :gen_tcp.send(sock, data)
-              client_loop(sock, handler, new_state)
+              client_loop(sock, handler, new_state)        # <--
 
             { :close, reply } ->
               :gen_tcp.send(sock, reply)
@@ -98,7 +98,7 @@ defmodule Server do
         else
           # Work like an echo server by default
           :gen_tcp.send(sock, packet)
-          client_loop(sock, handler, state)
+          client_loop(sock, handler, state)                # <--
         end
 
       { :error, reason } ->
