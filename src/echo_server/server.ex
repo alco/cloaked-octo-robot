@@ -27,7 +27,7 @@ defmodule Server do
   end
 
   """
-  This is a private function responsible for spawning new process to handle
+  This is a private function responsible for spawning new processes to handle
   incoming connections.
   """
   defp accept_loop(sock) do

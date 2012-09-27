@@ -6,7 +6,7 @@ Our server is working fine but it implements a very limited functionality. In or
 Here's an updated server interface that supports passing custom options to its `start` function.
 
 ```elixir
-# server.ex
+# server_stateless.ex
 defmodule Server do
   # The only public function
   def start(options)
@@ -14,8 +14,8 @@ defmodule Server do
   # Implementation details
   defp accept_loop(sock, options)
   defp spawn_client(sock, options)
-  def  client_start(sock, options)
-  defp client_loop(sock, state)
+  def  client_start(sock, handler)
+  defp client_loop(sock, handler)
 end
 ```
 
@@ -26,75 +26,57 @@ Let's add handlers by allowing the user to pass `[handler: fn]` as an option. In
 Here's an updated client_loop that receives data from the socket, passes it to the handler and sends replies from the handler back to the client.
 
 ```elixir
-  def client_loop(sock, handler, state // nil) do
+  defp client_loop(sock, handler) do
     pid = Process.self
-    if state === nil do
-      state = Orddict.new
-    end
 
+    # :gen_tcp.recv will block until some amount of data becomes available.
     case :gen_tcp.recv(sock, 0) do
       { :ok, packet } ->
         IO.puts "Process #{inspect pid} got packet #{packet}"
         if handler do
-          case handler.(packet, state) do
-            { :reply, data, new_state } ->
+          case handler.(packet) do
+            { :reply, data } ->
               :gen_tcp.send(sock, data)
-              client_loop(sock, handler, new_state)
+              client_loop(sock, handler)
 
             { :close, reply } ->
               :gen_tcp.send(sock, reply)
+              # note: no recursive call here
           end
         else
           # Work like an echo server by default
           :gen_tcp.send(sock, packet)
-          client_loop(sock, handler, state)
+          client_loop(sock, handler)
         end
-        :gen_tcp.close(sock)
+
       { :error, reason } ->
-        IO.puts "Process #{inspect pid} did recieve error #{reason}"
-        :gen_tcp.close(sock)
+        IO.puts "Process #{inspect pid}: Error receiving a packet: #{reason}"
     end
+
+    # If no recursive call has been done, then we end our affair with the client.
+    :gen_tcp.close(sock)
   end
 ```
 
 Let's also define a sample handler module. Unlike Erlang, Elixir does not impose a rule that each module should be defined in its own file, but we'll do it anyway to make an emphasis on the fact that handlers are independent of the server itself.
 
 ```elixir
+# handler_stateless.ex
 defmodule Handler do
   @moduledoc """
-  A stateful handler that keeps track of the number of items owned by the
-  client.
+  A stateless handler that performs a simplistic transformation of its input.
   """
 
   @doc """
-  `handle` is a multi-clause function, it has a separate definition for each of
-  the verbs we support and an extra clause for the default case.
+  This is a multi-clause function, it has a separate definition for each of the two cases we support.
   """
-  def handle("buy " <> data, state) do
-    count = Dict.get(state, data)
-    article = if count && count > 0 do
-      "another"
-    else
-      "a"
-    end
-    # Increment the counter for `data`
-    { :reply, "You've got #{article} #{data}", Dict.update(state, data, 1, &1 + 1)  }
+  def handle("bye" <> _rest) do
+    { :close, "Good bye, my friend" }
   end
 
-  @doc """
-  The second `handle` clause that decrements specified counter.
-  """
-  def handle("sell " <> data, state) do
-    count = Dict.get(state, data, 0)
-    if count > 0  do
-      { :reply, "You have sold the #{data}", Dict.update(state, data, &1 - 1) }
-    else
-      { :reply, "You don't have a #{data}", state }
-    end
-  end
-
-  def handle(data, _) do
-    { :close, "Don't know what to do with #{data}" }
+  # default case
+  def handle(data) do
+    { :reply, "Understood: #{data}" }
   end
 end
 ```
@@ -103,43 +85,29 @@ A test session:
 
 ```
 # Server
-λ iex server2.ex
+λ elixirc server_stateless.ex handler_stateless.ex
+Compiled handler_stateless.ex
+Compiled server_stateless.ex
+
+λ iex
 Interactive Elixir (0.6.0) - press Ctrl+C to exit
 Erlang R15B01 (erts-5.9.1) [source] [64-bit] [smp:4:4] [async-threads:0] [hipe] [kernel-poll:false]
 
-iex(1)> Server.start [port: 8000, handler: Handler.handle &1]
+iex(1)> Server.start [handler: Handler.handle &1]
 Listening on port 8000...
-Process <0.41.0> Got connection from an unknown client
-Process <0.41.0> got packet hello
+Process <0.37.0>: Got connection from a client: {127,0,0,1}:53795
+Process <0.37.0> got packet hello
 
-Process <0.42.0> Got connection from an unknown client
-Process <0.42.0> got packet buy pony
-
-Process <0.42.0> got packet buy bottle
-
-Process <0.42.0> got packet sell pony
-
-Process <0.42.0> got packet sell chicken
-
-Process <0.42.0> did recieve error closed
+Process <0.37.0> got packet bye
 ```
 
 ```
 # Client
 λ nc localhost 8000
 hello
-Don't know what to do with hello
-
-λ nc localhost 8000
-buy pony
-You've got a pony
-buy bottle
-You've got a bottle
-sell pony
-You have sold the pony
-sell chicken
-You have sold the chicken
-^C
+Understood: hello
+bye
+Good bye, my friend
 ```
 
 ## Adding state to the connection ##

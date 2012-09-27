@@ -8,7 +8,7 @@ Our server is working fine but it implements a very limited functionality. In or
 Here's an updated server interface that supports passing custom options to its `start` function.
 
 ```elixir
-# server.ex
+# server_stateless.ex
 defmodule Server do
   # The only public function
   def start(options)
@@ -16,8 +16,8 @@ defmodule Server do
   # Implementation details
   defp accept_loop(sock, options)
   defp spawn_client(sock, options)
-  def  client_start(sock, options)
-  defp client_loop(sock, state)
+  def  client_start(sock, handler)
+  defp client_loop(sock, handler)
 end
 ```
 
@@ -28,56 +28,43 @@ Let's add handlers by allowing the user to pass `[handler: fn]` as an option. In
 Here's an updated client_loop that receives data from the socket, passes it to the handler and sends replies from the handler back to the client.
 
 ```elixir
->>> server.ex: def client_loop
+>>> server_stateless.ex: def client_loop
 ```
 
 Let's also define a sample handler module. Unlike Erlang, Elixir does not impose a rule that each module should be defined in its own file, but we'll do it anyway to make an emphasis on the fact that handlers are independent of the server itself.
 
 ```elixir
->>> handler.ex: *
+# handler_stateless.ex
+>>> handler_stateless.ex: *
 ```
 
 A test session:
 
 ```
 # Server
-λ iex server2.ex
+λ elixirc server_stateless.ex handler_stateless.ex
+Compiled handler_stateless.ex
+Compiled server_stateless.ex
+
+λ iex
 Interactive Elixir (0.6.0) - press Ctrl+C to exit
 Erlang R15B01 (erts-5.9.1) [source] [64-bit] [smp:4:4] [async-threads:0] [hipe] [kernel-poll:false]
 
-iex(1)> Server.start [port: 8000, handler: Handler.handle &1]
+iex(1)> Server.start [handler: Handler.handle &1]
 Listening on port 8000...
-Process <0.41.0> Got connection from an unknown client
-Process <0.41.0> got packet hello
+Process <0.37.0>: Got connection from a client: {127,0,0,1}:53795
+Process <0.37.0> got packet hello
 
-Process <0.42.0> Got connection from an unknown client
-Process <0.42.0> got packet buy pony
-
-Process <0.42.0> got packet buy bottle
-
-Process <0.42.0> got packet sell pony
-
-Process <0.42.0> got packet sell chicken
-
-Process <0.42.0> did recieve error closed
+Process <0.37.0> got packet bye
 ```
 
 ```
 # Client
 λ nc localhost 8000
 hello
-Don't know what to do with hello
-
-λ nc localhost 8000
-buy pony
-You've got a pony
-buy bottle
-You've got a bottle
-sell pony
-You have sold the pony
-sell chicken
-You have sold the chicken
-^C
+Understood: hello
+bye
+Good bye, my friend
 ```
 
 ## Adding state to the connection ##
