@@ -3,5 +3,6 @@
 # This should be run from the root project directory
 
 for file in doc_src/*; do
-    python tools/place_code.py src/echo_server "$file" -o "${file#doc_src/}"
+    working_dir="$(head -1 "$file" | awk '{ print $2 }')"
+    python tools/place_code.py "$working_dir" "$file" -o "${file#doc_src/}"
 done

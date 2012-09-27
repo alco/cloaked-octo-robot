@@ -1,3 +1,5 @@
+working_dir: src/echo_server
+---
 Echo Server
 ===========
 

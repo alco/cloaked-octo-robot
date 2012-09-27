@@ -73,6 +73,12 @@ if __name__ == '__main__':
 
     placer = CodePlacement(args.working_dir)
     with open(args.markdown) as infile:
+        # Skip metadata
+        while True:
+            line = infile.readline()
+            if line.strip() == '---':
+                break
+
         output = replace_code(infile, placer)
 
     if args.o:
