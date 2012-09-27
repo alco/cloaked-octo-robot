@@ -1,3 +1,5 @@
+working_dir: src/request_handlers
+---
 Request Handlers
 ================
 
@@ -26,77 +28,13 @@ Let's add handlers by allowing the user to pass `[handler: fn]` as an option. In
 Here's an updated client_loop that receives data from the socket, passes it to the handler and sends replies from the handler back to the client.
 
 ```elixir
-  def client_loop(sock, handler, state // nil) do
-    pid = Process.self
-    if state === nil do
-      state = Orddict.new
-    end
-
-    case :gen_tcp.recv(sock, 0) do
-      { :ok, packet } ->
-        IO.puts "Process #{inspect pid} got packet #{packet}"
-        if handler do
-          case handler.(packet, state) do
-            { :reply, data, new_state } ->
-              :gen_tcp.send(sock, data)
-              client_loop(sock, handler, new_state)
-
-            { :close, reply } ->
-              :gen_tcp.send(sock, reply)
-          end
-        else
-          # Work like an echo server by default
-          :gen_tcp.send(sock, packet)
-          client_loop(sock, handler, state)
-        end
-        :gen_tcp.close(sock)
-      { :error, reason } ->
-        IO.puts "Process #{inspect pid} did recieve error #{reason}"
-        :gen_tcp.close(sock)
-    end
-  end
+>>> server.ex: def client_loop
 ```
 
 Let's also define a sample handler module. Unlike Erlang, Elixir does not impose a rule that each module should be defined in its own file, but we'll do it anyway to make an emphasis on the fact that handlers are independent of the server itself.
 
 ```elixir
-defmodule Handler do
-  @moduledoc """
-  A stateful handler that keeps track of the number of items owned by the
-  client.
-  """
-
-  @doc """
-  `handle` is a multi-clause function, it has a separate definition for each of
-  the verbs we support and an extra clause for the default case.
-  """
-  def handle("buy " <> data, state) do
-    count = Dict.get(state, data)
-    article = if count && count > 0 do
-      "another"
-    else
-      "a"
-    end
-    # Increment the counter for `data`
-    { :reply, "You've got #{article} #{data}", Dict.update(state, data, 1, &1 + 1)  }
-  end
-
-  @doc """
-  The second `handle` clause that decrements specified counter.
-  """
-  def handle("sell " <> data, state) do
-    count = Dict.get(state, data, 0)
-    if count > 0  do
-      { :reply, "You have sold the #{data}", Dict.update(state, data, &1 - 1) }
-    else
-      { :reply, "You don't have a #{data}", state }
-    end
-  end
-
-  def handle(data, _) do
-    { :close, "Don't know what to do with #{data}" }
-  end
-end
+>>> handler.ex: *
 ```
 
 A test session:
