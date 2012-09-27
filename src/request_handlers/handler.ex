@@ -10,17 +10,19 @@ defmodule Handler do
   """
   def handle("buy " <> data, state) do
     count = Dict.get(state, data)
-    article = if count && count > 0 do
-      "another"
-    else
-      "a"
-    end
+    article =
+      if count && count > 0 do
+        "another"
+      else
+        "a"
+      end
+
     # Increment the counter for `data`
     { :reply, "You've got #{article} #{data}", Dict.update(state, data, 1, &1 + 1)  }
   end
 
-  @doc """
-  The second `handle` clause that decrements specified counter.
+  """
+  The second `handle` clause that decrements the specified counter.
   """
   def handle("sell " <> data, state) do
     count = Dict.get(state, data, 0)
@@ -31,6 +33,9 @@ defmodule Handler do
     end
   end
 
+  """
+  Default case
+  """
   def handle(data, _) do
     { :close, "Don't know what to do with #{data}" }
   end

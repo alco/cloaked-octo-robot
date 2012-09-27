@@ -80,11 +80,8 @@ defmodule Server do
   The receive loop which waits for a packet from the client, then invokes the
   handler function and sends its return value back to the client.
   """
-  def client_loop(sock, handler, state // nil) do
+  def client_loop(sock, handler, state // Orddict.new) do
     pid = Process.self
-    if state === nil do
-      state = Orddict.new
-    end
 
     case :gen_tcp.recv(sock, 0) do
       { :ok, packet } ->
@@ -103,10 +100,12 @@ defmodule Server do
           :gen_tcp.send(sock, packet)
           client_loop(sock, handler, state)
         end
-        :gen_tcp.close(sock)
+
       { :error, reason } ->
         IO.puts "Process #{inspect pid} did recieve error #{reason}"
-        :gen_tcp.close(sock)
     end
+
+    # If no recursive call has been done, then we end our affair with the client.
+    :gen_tcp.close(sock)
   end
 end
