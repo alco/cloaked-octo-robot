@@ -1,33 +1,38 @@
 Request Handlers
 ================
 
-Our server is working fine but it implements a very limited functionality. In order to make it more useful, we will allow users to define custom handlers. A handler is a function that is called by the server whenever it recieves a new logical set of data. This approach allows us to have a single server module used by different applications. The application logic is implemented in the handlers while improving the server is beneficial for all applications based on it.
+Our server is working fine but it implements a very limited functionality. In order to make it more useful, we will allow users to define custom handlers. A handler is a function that is called by the server whenever it recieves a new logical set of data. This approach allows us to have a single server module used by different applications. Moreover, decoupling components in this way makes it easier to change them independent of one another. So we can build the application logic without ever changing the server or we can improve the server which will be beneficial for all applications that use it.
 
-Here's our updated server interface that supports passing custom info to its start method.
+Here's an updated server interface that supports passing custom options to its `start` function.
 
 ```elixir
+# server.ex
 defmodule Server do
-  def start(port // 8000, options)
-  def accept_loop(sock, options)
-  def spawn_client(sock, options)
-  def client_loop(sock, handler)
+  # The only public function
+  def start(options)
+
+  # Implementation details
+  defp accept_loop(sock, options)
+  defp spawn_client(sock, options)
+  def  client_start(sock, options)
+  defp client_loop(sock, state)
 end
 ```
 
-By introducing a second parameter in the start function we can customize the server by adding new options without breaking old code.
+By introducing a second parameter in the start function we'll be able to further customize the server by adding new options without breaking old code.
 
 Let's add handlers by allowing the user to pass `[handler: fn]` as an option. Inside the server implementation we will pass the handler all the way down to the client_loop. Since Elixir is a functional language, we can't easily store the options in some place and read them later inside the client_loop function. Functional approach dictates a slightly different thinking, hence the solution we've chosen.
 
 Here's an updated client_loop that receives data from the socket, passes it to the handler and sends replies from the handler back to the client.
 
 ```elixir
->>> Server: def client_loop
+>>> server.ex: def client_loop
 ```
 
-Let's also define a sample handler module. It can be placed in a separate file, but we'll put it right after the server in the same file this time.
+Let's also define a sample handler module. Unlike Erlang, Elixir does not impose a rule that each module should be defined in its own file, but we'll do it anyway to make an emphasis on the fact that handlers are independent of the server itself.
 
 ```elixir
->>> defmodule Handler
+>>> handler.ex: *
 ```
 
 A test session:
