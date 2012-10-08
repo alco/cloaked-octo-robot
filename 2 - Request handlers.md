@@ -26,7 +26,7 @@ We have replaced the `port` parameter with a more generic `options`. In this way
 
 Let's add handlers by allowing the user to pass `[handler: fn]` as an option. Inside the server implementation we will pass the handler all the way down to the `client_loop`. Since Elixir is a functional language, we can't easily store the options in some place and read them later inside the `client_loop` function. It is possible, but we'll take a functional approach and simply pass the argument to the subsequent function calls. Thus, most of the code remains the same save for the `spawn_client` function which extract the `handler` option:
 
-```
+```elixir
   defp spawn_client(sock, options) do
     # Retrieve the handler function (if any) from the options
     handler =
@@ -104,7 +104,18 @@ defmodule Handler do
 end
 ```
 
-Our handler has two clauses to demonstrate the both forms of return values described earlier. Finally, let's do a quick test session to see how our new server handles the job.
+Our handler has two clauses to demonstrate the both forms of return values described earlier. Finally, let's do a quick test session to see how our new server handles the job. We compiled our server and handler modules, launched the server and interacted with it using netcat in a separate terminal window.
+
+```
+# Client
+λ nc localhost 8000
+hello
+Understood: hello
+bye
+Good bye, my friend
+```
+
+Server side:
 
 ```
 # Server
@@ -124,17 +135,6 @@ Process <0.37.0> got packet hello
 Process <0.37.0> got packet bye
 ```
 
-We compiled our server and handler modules, launched the server and interacted with it using netcat in a separate terminal window:
-
-```
-# Client
-λ nc localhost 8000
-hello
-Understood: hello
-bye
-Good bye, my friend
-```
-
 This simplistic example already shows us how a little amount of code in Elixir can give sufficient results. Let's take this one step further and add state to our handler to make it more practical.
 
 ## A Stateful Handler ##
@@ -143,19 +143,19 @@ While having stateful connection is usually frowned upon in the mainstream web p
 
 Let's add some state to our server. This will change the signature of `client_loop` function and the way our `Handler` module is defined. Let's begin with the `client_loop` function.
 
-```
+```elixir
 # server.ex
-  def client_loop(sock, handler, state // Orddict.new) do
+  def client_loop(sock, handler, state // Orddict.new) do  # <--
     pid = Process.self
 
     case :gen_tcp.recv(sock, 0) do
       { :ok, packet } ->
         IO.puts "Process #{inspect pid} got packet #{packet}"
         if handler do
-          case handler.(packet, state) do
-            { :reply, data, new_state } ->
+          case handler.(packet, state) do                  # <--
+            { :reply, data, new_state } ->                 # <--
               :gen_tcp.send(sock, data)
-              client_loop(sock, handler, new_state)
+              client_loop(sock, handler, new_state)        # <--
 
             { :close, reply } ->
               :gen_tcp.send(sock, reply)
@@ -163,7 +163,7 @@ Let's add some state to our server. This will change the signature of `client_lo
         else
           # Work like an echo server by default
           :gen_tcp.send(sock, packet)
-          client_loop(sock, handler, state)
+          client_loop(sock, handler, state)                # <--
         end
 
       { :error, reason } ->
@@ -175,11 +175,11 @@ Let's add some state to our server. This will change the signature of `client_lo
   end
 ```
 
-The important parts are the function signature and the `case` block that follows `if handler do`. We have added a third argument -- `state` -- and initialized it with an empty `Orddict`. The block that invokes our handler has also been reworked to accomodate for the additional argument. Notice also that recursive calls have been changed to keep the state.
+The important parts (marked with arrows) are the function signature and the `case` block that follows `if handler do`. We have added a third argument -- `state` -- and initialized it with an empty `Orddict`. The block that invokes our handler has also been reworked to accomodate for the additional argument. Notice also that recursive calls have been changed to keep the state.
 
 Let's look at the modified Handler code.
 
-```
+```elixir
 # handler.ex
 defmodule Handler do
   @moduledoc """
@@ -230,6 +230,22 @@ We have changed the return values of the handler as well to allow to return upda
 Let's look at a sample test session for the updated server.
 
 ```
+# Client
+λ nc localhost 8000
+buy pony
+You've got a pony
+buy pony
+You've got another pony
+sell pony
+You have sold the pony
+sell pony
+You have sold the pony
+sell lamp
+You don't have a lamp
+^D
+```
+
+```
 # Server
 λ iex
 Interactive Elixir (0.6.0) - press Ctrl+C to exit
@@ -254,18 +270,3 @@ Process <0.38.0> got packet sell lamp
 Process <0.38.0> did recieve error closed
 ```
 
-```
-# Client
-λ nc localhost 8000
-buy pony
-You've got a pony
-buy pony
-You've got another pony
-sell pony
-You have sold the pony
-sell pony
-You have sold the pony
-sell lamp
-You don't have a lamp
-^D
-```
