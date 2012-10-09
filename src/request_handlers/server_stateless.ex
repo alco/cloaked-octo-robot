@@ -107,7 +107,7 @@ defmodule Server do
         IO.puts "Process #{inspect pid}: Error receiving a packet: #{reason}"
     end
 
-    # If no recursive call has been done, then we end our affair with the client.
+    # If no recursive call has been done, then we finish our business with the client.
     :gen_tcp.close(sock)
   end
 end

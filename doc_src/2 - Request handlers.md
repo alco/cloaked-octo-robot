@@ -26,19 +26,19 @@ end
 
 We have replaced the `port` parameter with a more generic `options`. In this way we'll be able to further customize the server by adding new options without breaking old code.
 
-Let's add handlers by allowing the user to pass `[handler: fn]` as an option. Inside the server implementation we will pass the handler all the way down to the `client_loop`. Since Elixir is a functional language, we can't easily store the options in some place and read them later inside the `client_loop` function. It is possible, but we'll take a functional approach and simply pass the argument to the subsequent function calls. Thus, most of the code remains the same save for the `spawn_client` function which extract the `handler` option:
+Let's add handlers by allowing the user to pass `[handler: fn]` as an option. Inside the server implementation we will pass the handler all the way down to the `client_loop`. Since Elixir is a functional language, we can't easily store the options in some place and read them later inside the `client_loop` function. It is possible, but we'll take a functional approach and simply pass the argument to the subsequent function calls. Thus, most of the code remains the same save for the `spawn_client` function which extracts the `handler` from the provided options:
 
 ```elixir
 >>> server_stateless.ex: def spawn_client
 ```
 
-Here's an updated `client_loop` that receives data from the socket, passes it to the handler and sends replies from the handler back to the client.
+Here's an updated `client_loop` that receives data from the socket, passes it to the handler and sends return values from the handler back to the client.
 
 ```elixir
 >>> server_stateless.ex: def client_loop
 ```
 
-Our handler takes one argument and returns a tuple of the specified form: it is either `{ :reply, data }` or `{ :close, data }`. The former one indicates that we should send `data` to the client and continue listening for more data. The second tuple form indicates that we should close the connection after sending `data` to the client.
+Our handler takes one argument and returns a tuple of the specified form: it is either `{ :reply, data }` or `{ :close, data }`. The former one indicates that we should send `data` to the client and continue listening waiting for more data to arrive. The second tuple form indicates that we should close the connection after sending `data` to the client.
 
 If no handler was provided, the server works as an echo server from our previous program (the `else` branch of the `if` block).
 
@@ -52,7 +52,7 @@ Now let's define a handler module. Unlike Erlang, Elixir does not impose the rul
 >>> handler_stateless.ex: *
 ```
 
-Our handler has two clauses to demonstrate the both forms of return values described earlier. Finally, let's do a quick test session to see how our new server handles the job. We compiled our server and handler modules, launched the server and interacted with it using netcat in a separate terminal window.
+Our handler has two clauses to demonstrate both forms of return values described earlier. Finally, let's perform a quick test run to see how our new server handles the job. We compile our server and handler modules, launch the server and interacted with it using `netcat` in a separate terminal window.
 
 ```
 # Client
@@ -83,7 +83,8 @@ Process <0.37.0> got packet hello
 Process <0.37.0> got packet bye
 ```
 
-This simplistic example already shows us how a little amount of code in Elixir can give sufficient results. Let's take this one step further and add state to our handler to make it more practical.
+This simplistic example already shows us how little amount of code in Elixir can give sufficient results. Let's take this one step further and add some state to our handler to make it more practical.
+
 
 ## A Stateful Handler ##
 
@@ -96,7 +97,7 @@ Let's add some state to our server. This will change the signature of `client_lo
 >>> server.ex: def client_loop
 ```
 
-The important parts (marked with arrows) are the function signature and the `case` block that follows `if handler do`. We have added a third argument -- `state` -- and initialized it with an empty `Orddict`. The block that invokes our handler has also been reworked to accomodate for the additional argument. Notice also that recursive calls have been changed to keep the state.
+The important parts (marked with arrows) are the function signature and the `case` block that follows `if handler do`. We have added a third argument -- `state` -- and initialized it with an empty `Orddict`. The block that invokes our handler has also been reworked to accomodate for the additional argument. Notice also that recursive calls have been changed to pass the state variable to each successive call, effectively keeping the state of the connection during its lifetime.
 
 Let's look at the modified Handler code.
 
@@ -105,7 +106,7 @@ Let's look at the modified Handler code.
 >>> handler.ex: *
 ```
 
-We have changed the return values of the handler as well to allow to return updated state object that will subsequently get passed to the recursive call of `client_loop`. All in all, the idea is quite simple in itself, but it allows for much flexibility in designing you own connection protocols.
+We have changed the return values of the handler as well to return updated state object that will subsequently get passed to a recursive call of `client_loop`. All in all, the idea is quite simple in itself, but it allows for much flexibility in designing you own connection protocols.
 
 Let's look at a sample test session for the updated server.
 
