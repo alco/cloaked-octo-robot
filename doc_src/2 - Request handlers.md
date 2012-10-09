@@ -128,6 +128,10 @@ You don't have a lamp
 
 ```
 # Server
+λ elixirc server.ex handler.ex
+Compiled handler.ex
+Compiled server.ex
+
 λ iex
 Interactive Elixir (0.6.0) - press Ctrl+C to exit
 Erlang R15B01 (erts-5.9.1) [source] [64-bit] [smp:8:8] [async-threads:0] [hipe] [kernel-poll:false]
