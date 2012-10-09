@@ -1,9 +1,9 @@
 Introduction
 ============
 
-This is general introduction to Elixir aimed at a wide audience: from people who are new to both Erlang and Elixir to programming veterans who are interested in Elixir's design and philosophy.
+This is a general introduction to Elixir aimed at a wide audience: from people who are new to both Erlang and Elixir to Erlang veterans who are interested in Elixir's design and philosophy.
 
-In this tutorial I will guide you from a basic TCP echo server to a fully functioning HTTP web-server able to server static and dynamic content. Currently, this is still very much a WIP (work in progress). Parts 1 & 2 have been finished, Part 3 is in a draft stage.
+In this tutorial I will guide you from a basic TCP echo server to a fully functioning HTTP web-server able to serve static and dynamic content. Currently, this is still very much a WIP (work in progress). Parts 1 & 2 have been finished, Part 3 is in a draft stage.
 
 Preliminary table of contents:
 
@@ -14,7 +14,7 @@ Preliminary table of contents:
 5. [Advanced HTTP techniques]()
 6. [Introducing OTP]()
 
-If you find any given part two easy, you may safely skim over the text, take a look at the code and proceed to the next part which describes more advanced material.
+If you find any given part too easy, you may safely skim over the text, take a look at the code and proceed to the next part which describes more advanced material.
 
 
 ---
